@@ -361,6 +361,10 @@ def concat_dicts(l):
 def stats_data_frame(list_of_stat_results, func):
 
     coordinates, stats = zip(*list_of_stat_results)
+
+    if type(stats[0]) is pd.Series:
+        stats = [x.to_dict() for x in stats]
+
     if type(stats[0]) is dict:
         d = OrderedDict(zip(('start', 'end'), zip(*coordinates)))
         d.update(concat_dicts(stats))
@@ -381,7 +385,7 @@ def genomic_windows(full_df, func, bin_iter, empty=True):
             list_of_stat_results.append(([bin_start, bin_start + bin_size], func(df)))
         else:
             try:
-                list_of_stat_results.append(([bin_start, bin_start + bin_size], func(pd.DataFrame())))
+                list_of_stat_results.append(([bin_start, bin_start + bin_size], func(pd.DataFrame(columns=full_df.columns))))
             except:
                 print("Decorated function does not handle empty windows", file=sys.stderr)
                 raise
@@ -493,90 +497,21 @@ if __name__ == "__main__":
 
     # unittest.main()
 
-
-    # SEE WHAT I DO IN THE ADMIXTURE NOTEBOOK TO MAKE SURE IT IS BACKWARDS COMPATIBLE...
-
-
-    full_df = pd.DataFrame({'chrom': ['chr1']+['chr2']*10,
+    data = pd.DataFrame({'chrom': ['chr1']+['chr2']*10,
                         'start': list(range(10)) + [40],
                         'end': list(map(sum, zip(range(10), [5, 1]*5+[20]))) + [45],
                         'value': 'AAA',
                        'foo': 7, 'bar': 9, 'baz' : 4})
 
-    # full_df = pd.DataFrame({'chrom': ['chr1']+['chr2']*10,
-    #                     'start': list(range(11)),
-    #                     'end': list(map(sum, zip(range(11), [5, 1]*5+[20]))),
-    #                     'value': 'AAA',
-    #                    'foo': 7, 'bar': 9, 'baz' : 4})
-    print(full_df)
 
-    # call this function windows of size 5
-    @window(size=5)
-    def count1(df):
-        return len(df.index)
-
-    print(full_df.groupby('chrom').apply(count1))#.reset_index())
-
-    # call this function windows of size 5
-    @window(size=10000000, empty=True, fill='hg19')
-    def count1(df):
-        return len(df.index)
-
-    print(full_df.groupby('chrom').apply(count1))#.reset_index())
-
-
-    print(full_df.groupby(['chrom', 'bar']).apply(count1))
-    #print(full_df.groupby(['chrom', 'bar']).apply(count1).reset_index())
-
-
-    # call this function on windows beginning at size 2 increasing by log 2
-    @window(size=2, logbase=2)
-    def count2(df):
-        return len(df.index)
-
-    print(full_df.groupby('chrom').apply(count2))#.reset_index(drop=True))
-
-    # call this function on windows with ~10 observations in each
-    @window(even=10)
-    def count3(df):
-        return {'count': len(df.index), 'sum': sum(df.end-df.start)}
-
-    print(full_df.groupby('chrom').apply(count3))#.reset_index(drop=True))
-
-    # call this function on windows with ~10 observations in each
-    @window(even=10)
+    @window(size=10)
     def stats_fun(df):
-        sr = df[['foo','bar']].sum()
-        return sr.to_dict()
+        return df[['foo','bar']].sum()
 
-    df = full_df.groupby(['chrom', 'baz']).apply(stats_fun)
-    print('##')
+
+    df = data.groupby(['chrom']).apply(stats_fun).reset_index(drop=True, level=-1).reset_index()
     print(df)
-    print(df.index)
 
-    # # write the data frame to a hdf5 store
-    # def write_df_store(df, store_file_name, df_name='df', table=True, append=False):
-    #     with pd.get_store(store_file_name) as store:
-    #         store.append(df_name, df, data_columns=True, #list(df.columns.values), 
-    #             table=table, append=append)
-
-#    write_df_store(full_df2, 'groupby.h5')
-
-    # # write the data frame to a hdf5 store
-    # with pd.get_store('groupby.h5') as store:
-    #     store.append('df', full_df, data_columns=['chrom', 'baz'], table=True, append=False)
-
-    # # perform the same groupby and apply operation as on the data frame
-    # df = store_groupby_apply('groupby.h5', ['chrom', 'baz'], stats_fun)
-    # print(df)
-    # print(df.index)
-    # #print(df.reset_index())
-
-    # TODO: 
-    # make sure exceptions fro the stats functions are raised properly
-    # Also dangerous that AttributeError in the stats function silently makes it fill with the fill stats
-
-    # the stats function should also be allowed to return a dataframe instead of a dict
 
     # next question: What happens when we group by the index (can we do that?) - and if so: should
     # we then still add the "groupby" columns to the resulting dataframes?
