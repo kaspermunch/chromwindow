@@ -1,11 +1,16 @@
 
-from setuptools import setup
+import setuptools
 
-setup(name='chromwindow',
-      version='1.1',
+setuptools.setup(name='chromwindow',
+      version='1.1.3',
+      author="Kasper Munch",
       description='Utilities for working with windows on a chromosome.',
+      # long_description=long_description,
+      long_description_content_type="text/markdown",
       url='https://github.com/kaspermunch/chromwindow',
-      author='Kasper Munch',
-      packages=['chromwindow'],
-      zip_safe=False)
+      packages=setuptools.find_packages(),
+      python_requires='>=3.6',
+      install_requires=[
+            'pandas>=1.0',
+      ])
 
