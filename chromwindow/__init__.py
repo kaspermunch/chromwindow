@@ -315,10 +315,11 @@ def even_windows(df, nrobs):
 
 
 class WindowCoordinates(object):
-    def __init__(self, binsize=None, logbase=1, bins=None):
+    def __init__(self, binsize=None, logbase=1, bins=None, start=0):
 
         self.bin_size = binsize
         self.log_base = logbase
+        self.start = start
         self.bin_list = bins
         if self.bin_list is not None:
             assert logbase == 1 and not binsize, "Don't use bins with binsize or logbase"
@@ -326,7 +327,7 @@ class WindowCoordinates(object):
             self.bin_size = self.bin_list.pop(0)
 
     def __iter__(self):
-        self.bin_start = 0
+        self.bin_start = self.start
         self.exhausted = False
         return self
 
@@ -412,7 +413,7 @@ def genomic_windows(full_df, func, bin_iter, empty=True):
     return stats_data_frame(list_of_stat_results, func)
 
 
-def get_bin_iterator(full_df, binsize, logbase, even):
+def get_bin_iterator(full_df, binsize, logbase, even, start):
 
     if even is not None:
         fixed_bins = even_windows(full_df, even)
@@ -446,20 +447,20 @@ def right_fill(df, func, size, fill, chrom):
     
     lst = list()
     for start in range(df['end'].max(), chrom_size, size):
-        lst.append(([start, start+size], func(pd.DataFrame())))
+        lst.append(([start, start+size], func(pd.DataFrame(columns=df.columns))))
     extra = stats_data_frame(lst, func)
 #    return pd.concat([df, extra], sort=False)
     return pd.concat([df, extra])
 
 
-def window(size=None, logbase=1, even=None, empty=True, fill=None):
+def window(size=None, logbase=1, even=None, empty=True, fill=None, start=0):
 
     def window_decorator(func):
 
         @wraps(func)
         def func_wrapper(full_df):
 
-            bin_iter = get_bin_iterator(full_df, size, logbase, even)
+            bin_iter = get_bin_iterator(full_df, size, logbase, even, start)
             window_data = genomic_windows(full_df, func, bin_iter, empty=empty)
             if fill:
                 assert not even and not logbase != 1 and fill
@@ -497,21 +498,27 @@ if __name__ == "__main__":
 
     # unittest.main()
 
-    data = pd.DataFrame({'chrom': ['chr1']+['chr2']*10,
+    data = pd.DataFrame({'chrom': ['chr2']+['chr2']*10,
                         'start': list(range(10)) + [40],
                         'end': list(map(sum, zip(range(10), [5, 1]*5+[20]))) + [45],
                         'value': 'AAA',
-                       'foo': 7, 'bar': 9, 'baz' : 4})
-
+                        'foo': 7, 'bar': 9, 'baz' : 4})
+    print(data)
 
     @window(size=10)
     def stats_fun(df):
         return df[['foo','bar']].sum()
 
-
     df = data.groupby(['chrom']).apply(stats_fun).reset_index(drop=True, level=-1).reset_index()
     print(df)
 
+
+    # @window(size=10, fill='hg19')
+    # def stats_fun(df):
+    #     return df[['foo','bar']].sum()
+
+    # df = data.groupby(['chrom']).apply(stats_fun).reset_index(drop=True, level=-1).reset_index()
+    # print(df)
 
     # next question: What happens when we group by the index (can we do that?) - and if so: should
     # we then still add the "groupby" columns to the resulting dataframes?
@@ -520,3 +527,25 @@ if __name__ == "__main__":
     # also next: I should use a by_chrom decorator like in GenomicIntervals to make windows handle separate choromosomes. 
     # That would still allow me to group by chormosomes (then there will just be one chrom in each df) if need be.
 
+
+    size = 30
+    step = 10
+    df_list = list()
+    for start in range(0, size, step):
+
+        assert (size / step) % 2 # must be uneven
+        mid_offset = (size / step) // 2 * step
+
+        @window(size=size, start=start)
+        def stats_fun(df):
+            return df.foo.mean()
+        
+        offset_df = data.groupby(['chrom']).apply(stats_fun)
+        offset_df['start'] = offset_df.start + mid_offset + start
+        offset_df['end'] = offset_df.start + step
+        
+        df_list.append(offset_df)
+        
+    df = pd.concat(df_list).sort_values('start')
+
+    print(df)
