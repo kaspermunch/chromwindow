@@ -431,7 +431,7 @@ def get_chrom(df):
     return values[0]
 
 
-def right_fill(df, func, size, fill, chrom):
+def right_fill(df, func, size, fill, chrom, data_columns):
 
     try:
         chrom_size = chrom_sizes[fill][chrom]
@@ -447,7 +447,7 @@ def right_fill(df, func, size, fill, chrom):
     
     lst = list()
     for start in range(df['end'].max(), chrom_size, size):
-        lst.append(([start, start+size], func(pd.DataFrame(columns=df.columns))))
+        lst.append(([start, start+size], func(pd.DataFrame(columns=data_columns))))
     extra = stats_data_frame(lst, func)
 #    return pd.concat([df, extra], sort=False)
     return pd.concat([df, extra])
@@ -464,7 +464,7 @@ def window(size=None, logbase=1, even=None, empty=True, fill=None, start=0):
             window_data = genomic_windows(full_df, func, bin_iter, empty=empty)
             if fill:
                 assert not even and not logbase != 1 and fill
-                window_data = right_fill(window_data, func, size, fill, get_chrom(full_df))
+                window_data = right_fill(window_data, func, size, fill, get_chrom(full_df), full_df.columns)
             return window_data
 
         return func_wrapper
