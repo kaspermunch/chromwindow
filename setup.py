@@ -2,7 +2,7 @@
 import setuptools
 
 setuptools.setup(name='chromwindow',
-      version='1.1.4',
+      version='1.1.5',
       author="Kasper Munch",
       description='Utilities for working with windows on a chromosome.',
       # long_description=long_description,
