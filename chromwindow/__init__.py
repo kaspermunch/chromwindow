@@ -314,6 +314,32 @@ def even_windows(df, nrobs):
     return bins
 
 
+def find_phys_coord(pos, gen_map, phys_map):
+    idx = bisect(gen_map, pos)
+    if idx < len(phys_map):
+        assert idx > 0
+        phys_left, phys_right = phys_map[idx-1], phys_map[idx]
+        gen_left, gen_right = gen_map[idx-1], gen_map[idx]
+        phys_rel_offset_in_interval = (pos - gen_left) / (gen_right - gen_left)
+        phys_pos = phys_left + phys_rel_offset_in_interval * (phys_right - phys_left) 
+    else:
+        return None
+    return phys_pos
+
+
+def genetic_windows(gen_size, phys_coords, gen_coords):
+    assert phys_coords == sorted(phys_coords)
+    assert gen_coords == sorted(gen_coords)
+    window_pos = []
+    gen_coord = gen_coords[0]
+    phys_coord = find_phys_coord(gen_coord, gen_coords, phys_coords)
+    while phys_coord is not None:
+        window_pos.append(phys_coord)            
+        gen_coord += gen_size
+        phys_coord = find_phys_coord(gen_coord, gen_coords, phys_coords)
+    return window_pos[0], list(e - s for (s, e) in zip(window_pos[:-1], window_pos[1:])), 
+
+
 class WindowCoordinates(object):
     def __init__(self, binsize=None, logbase=1, bins=None, start=0):
 
@@ -413,13 +439,17 @@ def genomic_windows(full_df, func, bin_iter, empty=True):
     return stats_data_frame(list_of_stat_results, func)
 
 
-def get_bin_iterator(full_df, binsize, logbase, even, start):
+def get_bin_iterator(full_df, binsize, logbase, even, start=0):
 
     if even is not None:
         fixed_bins = even_windows(full_df, even)
+    # elif genetic is not None:
+    #     chrom = get_chrom(full_df)
+    #     phys_coords, gen_coords = zip(*[p, g for (c, p, g) in genetic if c == chrom])
+    #     start, fixed_bins = genetic_windows(size, phys_coords, gen_coords)
     else:
         fixed_bins = None
-    bin_iter = iter(WindowCoordinates(binsize=binsize, logbase=logbase, bins=fixed_bins))
+    bin_iter = iter(WindowCoordinates(binsize=binsize, logbase=logbase, bins=fixed_bins, start=start))
 
     return bin_iter
 
